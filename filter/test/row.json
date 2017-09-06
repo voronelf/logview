@@ -1,0 +1,6 @@
+{
+  "strField": "someString",
+  "intField": 123,
+  "floatField": 56.78,
+  "strLong": "Many words in one string with spaces"
+}
