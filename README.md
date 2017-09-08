@@ -3,6 +3,7 @@ Logview is a tool for see logs in json format with filtration.
 
 ## Installation
 ```
+go get github.com/voronelf/logview
 go install github.com/voronelf/logview
 ```
 
