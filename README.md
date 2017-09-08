@@ -1,4 +1,4 @@
-# Logview [![Build Status](https://travis-ci.org/voronelf/logview.svg?branch=master)]
+# Logview [![Build Status](https://travis-ci.org/voronelf/logview.svg?branch=master)](https://travis-ci.org/voronelf/logview)
 Logview is a tool for see logs in json format with filtration.
 
 ## Installation
