@@ -7,15 +7,15 @@ import (
 
 var diContainer *DIContainer
 
-// GetDIContainer returns global DIContainer container instance
-func GetDIContainer() *DIContainer {
+// GetGlobalDIContainer returns global DIContainer container instance
+func GetGlobalDIContainer() *DIContainer {
 	if diContainer == nil {
-		diContainer = newDI()
+		diContainer = NewDIContainer()
 	}
 	return diContainer
 }
 
-func newDI() *DIContainer {
+func NewDIContainer() *DIContainer {
 	return &DIContainer{objects: []*inject.Object{}}
 }
 

@@ -6,12 +6,16 @@ import (
 	"os"
 )
 
-type FileReader struct {
+func NewFileReader() *reader {
+	return &reader{}
 }
 
-var _ core.FileReader
+type reader struct {
+}
 
-func (*FileReader) ReadAll(filePath string, filter core.Filter) (<-chan core.Row, error) {
+var _ core.FileReader = (*reader)(nil)
+
+func (*reader) ReadAll(filePath string, filter core.Filter) (<-chan core.Row, error) {
 	filteredRowsCh := make(chan core.Row, 1)
 	fd, err := os.Open(filePath)
 	if err != nil {

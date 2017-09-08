@@ -14,22 +14,22 @@ type t2 struct {
 func TestGetDIContainer(t *testing.T) {
 	first := t1{}
 	func() {
-		di1 := GetDIContainer()
+		di1 := GetGlobalDIContainer()
 		di1.Provide("t1_name", &first)
 	}()
 	second := t2{}
 	func() {
-		di2 := GetDIContainer()
+		di2 := GetGlobalDIContainer()
 		di2.Provide("", &second)
 	}()
-	di3 := GetDIContainer()
+	di3 := GetGlobalDIContainer()
 	err := di3.Populate()
 	assert.Nil(t, err)
 	assert.Equal(t, &first, second.Field)
 }
 
 func TestDI_Populate(t *testing.T) {
-	di := newDI()
+	di := NewDIContainer()
 	first := t1{}
 	di.Provide("t1_name", &first)
 	second := t2{}
