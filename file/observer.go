@@ -42,7 +42,7 @@ func (o *implObserver) Subscribe(ctx context.Context, filePath string, filter co
 
 	go func() {
 		defer watcher.Close()
-		reader := bufio.NewReaderSize(file, 16384)
+		reader := bufio.NewReaderSize(file, maxBytesInRow)
 		for {
 			select {
 			case event := <-watcher.Events:

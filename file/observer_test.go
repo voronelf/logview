@@ -62,7 +62,7 @@ func TestObserverImpl_Subscribe(t *testing.T) {
 	mu.Unlock()
 
 	file.Write([]byte("{\"field\": 777}\n{\"field\": 888.99}\n"))
-	time.Sleep(time.Millisecond)
+	time.Sleep(2 * time.Millisecond)
 	mu.Lock()
 	if assert.Equal(t, 3, len(catched)) {
 		assert.Equal(t, float64(777), catched[1].Data["field"])

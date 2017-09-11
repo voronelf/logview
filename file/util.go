@@ -8,6 +8,8 @@ import (
 	"io"
 )
 
+const maxBytesInRow = 16384
+
 func readToEOF(reader *bufio.Reader, filter core.Filter, outputCh chan<- core.Row) {
 	for {
 		row := core.Row{

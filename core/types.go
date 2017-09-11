@@ -38,5 +38,5 @@ type Formatter interface {
 //go:generate mockery -name FileReader -inpkg -case=underscore
 
 type FileReader interface {
-	ReadAll(filePath string, filter Filter) (<-chan Row, error)
+	ReadTail(filePath string, b int64, filter Filter) (<-chan Row, error)
 }

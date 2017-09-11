@@ -19,11 +19,11 @@ var _ cli.Command = (*Tail)(nil)
 
 func (c *Tail) Run(args []string) int {
 	var filePath, filterCondition string
-	var rowsCount int
+	var bytesCount int64
 	cmdFlags := flag.NewFlagSet("tail", flag.ContinueOnError)
 	cmdFlags.StringVar(&filePath, "f", "", "")
 	cmdFlags.StringVar(&filterCondition, "c", "", "")
-	cmdFlags.IntVar(&rowsCount, "n", 0, "")
+	cmdFlags.Int64Var(&bytesCount, "b", 0, "")
 	err := cmdFlags.Parse(args)
 	if err != nil {
 		return cli.RunResultHelp
@@ -38,7 +38,7 @@ func (c *Tail) Run(args []string) int {
 		return 1
 	}
 
-	filteredRowsCh, err := c.FileReader.ReadAll(filePath, filter)
+	filteredRowsCh, err := c.FileReader.ReadTail(filePath, bytesCount, filter)
 	if err != nil {
 		c.Ui.Error(err.Error())
 		return 1
@@ -61,14 +61,14 @@ func (c *Tail) Run(args []string) int {
 }
 
 func (*Tail) Synopsis() string {
-	return "Analyze last n rows from log file and show rows matched by filter condition. Args: -f filePath [-c condition] [-n rowsCount]"
+	return "Analyze last n rows from log file and show rows matched by filter condition. Args: -f filePath [-c condition] [-b bytes]"
 }
 
 func (*Tail) Help() string {
 	text := `
-Usage: logview tail -f filePath [-c condition] [-n rowsCount]
+Usage: logview tail -f filePath [-c condition] [-b bytes]
 
-    Analyze last n rows from log file and show rows matched by filter condition
+    Analyze last b bytes from log file and show rows matched by filter condition
 
 Options:
 
@@ -78,7 +78,7 @@ Options:
                    operation is one of '=', '!=', '~', '!~'.
                    Field checks are divided by logic operations: 'and', 'or'.
                    Also you can use brackets.
-    -n rowCount    Count last rows in file for analyzing
+    -b bytes       Count of bytes to last rows in file for analyzing
 `
 	return strings.TrimSpace(text)
 }

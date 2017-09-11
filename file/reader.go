@@ -15,15 +15,21 @@ type reader struct {
 
 var _ core.FileReader = (*reader)(nil)
 
-func (*reader) ReadAll(filePath string, filter core.Filter) (<-chan core.Row, error) {
+func (*reader) ReadTail(filePath string, b int64, filter core.Filter) (<-chan core.Row, error) {
 	filteredRowsCh := make(chan core.Row, 1)
 	fd, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
 	}
+	if b > 0 {
+		fd.Seek(-b, 2)
+	}
 	go func() {
 		defer fd.Close()
-		reader := bufio.NewReaderSize(fd, 16384)
+		reader := bufio.NewReaderSize(fd, maxBytesInRow)
+		if b > 0 {
+			reader.ReadLine()
+		}
 		readToEOF(reader, filter, filteredRowsCh)
 		close(filteredRowsCh)
 	}()

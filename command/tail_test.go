@@ -32,10 +32,10 @@ func TestTail_Run(t *testing.T) {
 	channel <- row
 	close(channel)
 	mockFilterFactory.On("NewFilter", "someFilter").Return(filter, nil).Once()
-	mockFileReader.On("ReadAll", "someFile", filter).Return((<-chan core.Row)(channel), nil).Once()
+	mockFileReader.On("ReadTail", "someFile", int64(123), filter).Return((<-chan core.Row)(channel), nil).Once()
 	mockFormatter.On("Format", row).Return("SomeData").Twice()
 
-	cmd.Run([]string{"-f", "someFile", "-c", "someFilter"})
+	cmd.Run([]string{"-f", "someFile", "-b", "123", "-c", "someFilter"})
 	mockFilterFactory.AssertExpectations(t)
 	mockFileReader.AssertExpectations(t)
 	mockFormatter.AssertExpectations(t)
