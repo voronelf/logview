@@ -4,9 +4,9 @@ import (
 	"github.com/mitchellh/cli"
 	"github.com/voronelf/logview/command"
 	"github.com/voronelf/logview/core"
-	"github.com/voronelf/logview/file"
 	"github.com/voronelf/logview/filter"
 	"github.com/voronelf/logview/formatter"
+	"github.com/voronelf/logview/provider"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,14 +15,11 @@ import (
 func provideCommandsDependenciesInDI(di *core.DIContainer, ui cli.Ui) {
 	di.Provide("CliUi", ui)
 
-	var obs core.Observer = file.NewObserver()
-	di.Provide("Observer", obs)
+	var rowProvider core.RowProvider = provider.NewRowProvider()
+	di.Provide("RowProvider", rowProvider)
 
-	var fileReader core.FileReader = file.NewFileReader()
-	di.Provide("FileReader", fileReader)
-
-	var ff core.FilterFactory = filter.NewFactory()
-	di.Provide("FilterFactory", ff)
+	var factory core.FilterFactory = filter.NewFactory()
+	di.Provide("FilterFactory", factory)
 
 	var f core.Formatter = formatter.NewCliColor()
 	di.Provide("FormatterCliColor", f)
@@ -30,7 +27,7 @@ func provideCommandsDependenciesInDI(di *core.DIContainer, ui cli.Ui) {
 
 func getCommands(di *core.DIContainer) map[string]cli.CommandFactory {
 	return map[string]cli.CommandFactory{
-		"watch": newCmdFactory(di, &command.Watch{ShutdownCh: getShutdownCh()}),
+		"watch": newCmdFactory(di, &command.Watch{ShutdownCh: getShutdownCh(), Stdin: os.Stdin}),
 		"tail":  newCmdFactory(di, &command.Tail{ShutdownCh: getShutdownCh()}),
 	}
 }

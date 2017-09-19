@@ -1,6 +1,7 @@
 package command
 
 import (
+	"context"
 	"flag"
 	"github.com/mitchellh/cli"
 	"github.com/voronelf/logview/core"
@@ -9,7 +10,7 @@ import (
 
 type Tail struct {
 	ShutdownCh    <-chan struct{}
-	FileReader    core.FileReader    `inject:"FileReader"`
+	RowProvider   core.RowProvider   `inject:"RowProvider"`
 	FilterFactory core.FilterFactory `inject:"FilterFactory"`
 	Formatter     core.Formatter     `inject:"FormatterCliColor"`
 	Ui            cli.Ui             `inject:"CliUi"`
@@ -37,23 +38,26 @@ func (c *Tail) Run(args []string) int {
 		c.Ui.Error(err.Error())
 		return 1
 	}
-
-	filteredRowsCh, err := c.FileReader.ReadTail(filePath, bytesCount, filter)
+	ctx, cancelCtx := context.WithCancel(context.Background())
+	defer cancelCtx()
+	rowsChan, err := c.RowProvider.ReadFileTail(ctx, filePath, bytesCount)
 	if err != nil {
 		c.Ui.Error(err.Error())
 		return 1
 	}
 	for {
 		select {
-		case row, ok := <-filteredRowsCh:
+		case row, ok := <-rowsChan:
 			if !ok {
 				return 0
 			}
 			if row.Err != nil {
-				c.Ui.Error(err.Error())
-				return 1
+				c.Ui.Error(row.Err.Error())
+				continue
 			}
-			c.Ui.Output(c.Formatter.Format(row))
+			if filter.Match(row) {
+				c.Ui.Output(c.Formatter.Format(row))
+			}
 		case <-c.ShutdownCh:
 			return 0
 		}

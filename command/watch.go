@@ -3,14 +3,17 @@ package command
 import (
 	"context"
 	"flag"
+	"fmt"
 	"github.com/mitchellh/cli"
 	"github.com/voronelf/logview/core"
+	"io"
 	"strings"
 )
 
 type Watch struct {
 	ShutdownCh    <-chan struct{}
-	Observer      core.Observer      `inject:"Observer"`
+	Stdin         io.Reader
+	RowProvider   core.RowProvider   `inject:"RowProvider"`
 	FilterFactory core.FilterFactory `inject:"FilterFactory"`
 	Formatter     core.Formatter     `inject:"FormatterCliColor"`
 	Ui            cli.Ui             `inject:"CliUi"`
@@ -27,28 +30,70 @@ func (c *Watch) Run(args []string) int {
 	if err != nil {
 		return cli.RunResultHelp
 	}
-	if filePath == "" {
-		return cli.RunResultHelp
-	}
 
 	filter, err := c.FilterFactory.NewFilter(filterCondition)
 	if err != nil {
 		c.Ui.Error(err.Error())
 		return 1
 	}
+
+	if filePath == "" {
+		c.Ui.Output(messageWatchStdin(filterCondition))
+		return c.watchStdin(filter)
+	} else {
+		c.Ui.Output(messageWatchFile(filePath, filterCondition))
+		return c.watchFile(filePath, filter)
+	}
+}
+
+func (c *Watch) watchFile(filePath string, filter core.Filter) int {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	defer cancelCtx()
-	s, err := c.Observer.Subscribe(ctx, filePath, filter)
+	rowsChan, err := c.RowProvider.WatchFileChanges(ctx, filePath)
 	if err != nil {
 		c.Ui.Error(err.Error())
 		return 1
 	}
-
-	c.Ui.Output("Watch file " + filePath + " with filter \"" + filterCondition + "\"")
 	for {
 		select {
-		case row := <-s.Channel:
-			c.Ui.Output(c.Formatter.Format(row))
+		case row, ok := <-rowsChan:
+			if !ok {
+				return 0
+			}
+			if row.Err != nil {
+				c.Ui.Error(row.Err.Error())
+				continue
+			}
+			if filter.Match(row) {
+				c.Ui.Output(c.Formatter.Format(row))
+			}
+		case <-c.ShutdownCh:
+			return 0
+		}
+	}
+}
+
+func (c *Watch) watchStdin(filter core.Filter) int {
+	ctx, cancelCtx := context.WithCancel(context.Background())
+	defer cancelCtx()
+	rowsChan, err := c.RowProvider.WatchOpenedStream(ctx, c.Stdin)
+	if err != nil {
+		c.Ui.Error(err.Error())
+		return 1
+	}
+	for {
+		select {
+		case row, ok := <-rowsChan:
+			if !ok {
+				return 0
+			}
+			if row.Err != nil {
+				c.Ui.Error(row.Err.Error())
+				continue
+			}
+			if filter.Match(row) {
+				c.Ui.Output(c.Formatter.Format(row))
+			}
 		case <-c.ShutdownCh:
 			return 0
 		}
@@ -56,18 +101,18 @@ func (c *Watch) Run(args []string) int {
 }
 
 func (*Watch) Synopsis() string {
-	return "Subscribe on log file changes, analize new rows and show rows matched by filter condition. Args: -f filePath [-c condition]"
+	return "Subscribe on log file changes, analyze new rows and show rows matched by filter condition. Args: [-f filePath] [-c condition]"
 }
 
 func (*Watch) Help() string {
 	text := `
-Usage: logview watch -f filePath [-c condition]
+Usage: logview watch [-f filePath] [-c condition]
 
-    Subscribe on log file changes, analize new rows and show rows matched by filter condition
+    Subscribe on log file changes, analyze new rows and show rows matched by filter condition
 
 Options:
 
-    -f filePath    Log file path, required
+    -f filePath    Log file path, if emtpy - used stdin
     -c condition   Filter condition. Contains one or more field check.
                    Every field check is: 'fieldName operation fieldValue', where
                    operation is one of '=', '!=', '~', '!~'.
@@ -75,4 +120,12 @@ Options:
                    Also you can use brackets.
 `
 	return strings.TrimSpace(text)
+}
+
+func messageWatchStdin(filterCondition string) string {
+	return fmt.Sprintf("Watch with filter \"%s\"\n\n", filterCondition)
+}
+
+func messageWatchFile(filePath, filterCondition string) string {
+	return fmt.Sprintf("Watch file \"%s\" with filter \"%s\"\n\n", filePath, filterCondition)
 }

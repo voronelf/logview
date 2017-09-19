@@ -1,6 +1,7 @@
 package command
 
 import (
+	"bytes"
 	"github.com/mitchellh/cli"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -14,7 +15,7 @@ import (
 func newWatchForTest() (*Watch, chan<- struct{}) {
 	shutdownCh := make(chan struct{})
 	return &Watch{
-		Observer:      &core.MockObserver{},
+		RowProvider:   &core.MockRowProvider{},
 		FilterFactory: &core.MockFilterFactory{},
 		Formatter:     &core.MockFormatter{},
 		Ui:            &cli.MockUi{},
@@ -22,33 +23,64 @@ func newWatchForTest() (*Watch, chan<- struct{}) {
 	}, shutdownCh
 }
 
-func TestWatch_Run(t *testing.T) {
+func TestWatch_Run_File(t *testing.T) {
 	cmd, shutdownCh := newWatchForTest()
 	defer close(shutdownCh)
-	mockObserver := cmd.Observer.(*core.MockObserver)
+	mockProvider := cmd.RowProvider.(*core.MockRowProvider)
 	mockFormatter := cmd.Formatter.(*core.MockFormatter)
 	mockFilterFactory := cmd.FilterFactory.(*core.MockFilterFactory)
 
-	filter := &core.MockFilter{}
-	inputCh := make(chan core.Row, 1)
-	s := core.Subscription{Channel: inputCh}
+	rowsChan := make(chan core.Row, 2)
 	row := core.Row{Data: map[string]interface{}{"someKey": "someValue"}}
-
-	mockFilterFactory.On("NewFilter", "someFilter").Return(filter, nil).Once()
-	mockObserver.On("Subscribe", mock.Anything, "someFile", filter).Return(s, nil).Once()
+	mockFilter := &core.MockFilter{}
+	mockFilterFactory.On("NewFilter", "someFilter").Return(mockFilter, nil).Once()
+	mockProvider.On("WatchFileChanges", mock.Anything, "someFile").Return((<-chan core.Row)(rowsChan), nil).Once()
+	mockFilter.On("Match", row).Return(true).Twice()
 	mockFormatter.On("Format", row).Return("SomeData").Twice()
 
 	go cmd.Run([]string{"-f", "someFile", "-c", "someFilter"})
 	time.Sleep(time.Millisecond)
-	inputCh <- row
+	rowsChan <- row
 	time.Sleep(time.Millisecond)
-	inputCh <- row
+	rowsChan <- row
 	time.Sleep(time.Millisecond)
 
+	mockProvider.AssertExpectations(t)
 	mockFilterFactory.AssertExpectations(t)
-	mockObserver.AssertExpectations(t)
+	mockFilter.AssertExpectations(t)
 	mockFormatter.AssertExpectations(t)
-	expectedOutput := "Watch file someFile with filter \"someFilter\"\nSomeData\nSomeData\n"
+	expectedOutput := messageWatchFile("someFile", "someFilter") + "\nSomeData\nSomeData\n"
+	assert.Equal(t, expectedOutput, cmd.Ui.(*cli.MockUi).OutputWriter.String())
+}
+
+func TestWatch_Run_Stdin(t *testing.T) {
+	cmd, shutdownCh := newWatchForTest()
+	defer close(shutdownCh)
+	cmd.Stdin = &bytes.Buffer{}
+	mockProvider := cmd.RowProvider.(*core.MockRowProvider)
+	mockFormatter := cmd.Formatter.(*core.MockFormatter)
+	mockFilterFactory := cmd.FilterFactory.(*core.MockFilterFactory)
+
+	rowsCh := make(chan core.Row, 2)
+	row := core.Row{Data: map[string]interface{}{"someKey": "someValue"}}
+	mockFilter := &core.MockFilter{}
+	mockFilterFactory.On("NewFilter", "someFilter").Return(mockFilter, nil).Once()
+	mockProvider.On("WatchOpenedStream", mock.Anything, cmd.Stdin).Return((<-chan core.Row)(rowsCh), nil).Once()
+	mockFilter.On("Match", row).Return(true).Twice()
+	mockFormatter.On("Format", row).Return("SomeData").Twice()
+
+	go cmd.Run([]string{"-c", "someFilter"})
+	time.Sleep(time.Millisecond)
+	rowsCh <- row
+	time.Sleep(time.Millisecond)
+	rowsCh <- row
+	time.Sleep(time.Millisecond)
+
+	mockProvider.AssertExpectations(t)
+	mockFilterFactory.AssertExpectations(t)
+	mockFilter.AssertExpectations(t)
+	mockFormatter.AssertExpectations(t)
+	expectedOutput := messageWatchStdin("someFilter") + "\nSomeData\nSomeData\n"
 	assert.Equal(t, expectedOutput, cmd.Ui.(*cli.MockUi).OutputWriter.String())
 }
 
@@ -56,40 +88,38 @@ func TestWatch_Run_Shutdown(t *testing.T) {
 	cmd, shutdownCh := newWatchForTest()
 
 	cmd.FilterFactory.(*core.MockFilterFactory).On("NewFilter", mock.Anything).Return(&core.MockFilter{}, nil)
-	s := core.Subscription{Channel: make(chan core.Row, 1)}
-	cmd.Observer.(*core.MockObserver).On("Subscribe", mock.Anything, mock.Anything, mock.Anything).Return(s, nil)
+	cmd.RowProvider.(*core.MockRowProvider).On("WatchFileChanges", mock.Anything, mock.Anything, mock.Anything).Return(make(<-chan core.Row), nil)
 
 	done := false
-	mu := sync.Mutex{}
+	cond := sync.NewCond(&sync.Mutex{})
 	go func() {
 		cmd.Run([]string{"-f", "someFile", "-c", "someFilter"})
-		mu.Lock()
+		cond.L.Lock()
 		done = true
-		mu.Unlock()
+		cond.L.Unlock()
+		cond.Broadcast()
 	}()
 
 	close(shutdownCh)
-	time.Sleep(5 * time.Millisecond)
-	mu.Lock()
+	cond.L.Lock()
+	cond.Wait()
 	assert.True(t, done)
-	mu.Unlock()
+	cond.L.Unlock()
 }
 
 func TestWatch_Run_SubscribeError(t *testing.T) {
 	cmd, shutdownCh := newWatchForTest()
 	defer close(shutdownCh)
-	mockObserver := cmd.Observer.(*core.MockObserver)
+	mockProvider := cmd.RowProvider.(*core.MockRowProvider)
 	mockFilterFactory := cmd.FilterFactory.(*core.MockFilterFactory)
 
-	filter := &core.MockFilter{}
-
-	mockFilterFactory.On("NewFilter", "someFilter").Return(filter, nil).Once()
-	mockObserver.On("Subscribe", mock.Anything, "someFile", filter).Return(core.Subscription{}, errors.New("Some error")).Once()
+	mockFilterFactory.On("NewFilter", "someFilter").Return(&core.MockFilter{}, nil).Once()
+	mockProvider.On("WatchFileChanges", mock.Anything, "someFile").Return(nil, errors.New("Some error")).Once()
 
 	cmd.Run([]string{"-f", "someFile", "-c", "someFilter"})
 
 	mockFilterFactory.AssertExpectations(t)
-	mockObserver.AssertExpectations(t)
+	mockProvider.AssertExpectations(t)
 	assert.Equal(t, "Some error\n", cmd.Ui.(*cli.MockUi).ErrorWriter.String())
 }
 

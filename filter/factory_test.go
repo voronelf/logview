@@ -26,7 +26,7 @@ func getRow() core.Row {
 }
 
 // for debug
-func test_showLexems(t *testing.T) {
+func test_showLexems(_ *testing.T) {
 	condition := "intField = '123'"
 	lexer, err := initLexer()
 	if err != nil {
@@ -83,6 +83,9 @@ func TestFactory_NewFilter(t *testing.T) {
 		24: {condition: "intField = '123' and (strField = wrongString or floatField = 56.78)", expected: true},
 		25: {condition: "(intField = '123' and strLong ~ 'Words') or floatField = 56.78", expected: true},
 		26: {condition: "intField = 78|654|123 and strLong ~ Words|cucumber and floatField = 56.78", expected: true},
+		27: {condition: " *", expected: true},
+		28: {condition: "* ", expected: true},
+		29: {condition: " ", expected: true},
 	}
 	for key, cs := range cases {
 		t.Run(strconv.Itoa(key), func(t *testing.T) {

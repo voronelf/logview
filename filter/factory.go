@@ -17,15 +17,15 @@ type factory struct {
 }
 
 func (*factory) NewFilter(condition string) (core.Filter, error) {
-	if condition == "" || condition == "*" {
+	cleanedCondition := strings.ToLower(strings.TrimSpace(condition))
+	if cleanedCondition == "" || cleanedCondition == "*" {
 		return &All{}, nil
 	}
 	lexer, err := initLexer()
 	if err != nil {
 		return nil, err
 	}
-	lower := strings.ToLower(condition)
-	scanner, err := lexer.Scanner([]byte(lower))
+	scanner, err := lexer.Scanner([]byte(cleanedCondition))
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +55,7 @@ const (
 
 func initLexer() (*lex.Lexer, error) {
 	lexer := lex.NewLexer()
-	lexer.Add([]byte("([a-z]|[0-9]|_|\\-|\\.|\\|)+"), analizeString)
+	lexer.Add([]byte("([a-z]|[0-9]|_|\\-|\\.|\\|)+"), analyzeString)
 	lexer.Add([]byte("\\'"), giveStringBetweenQuotes('\''))
 	lexer.Add([]byte("\\\""), giveStringBetweenQuotes('"'))
 	lexer.Add([]byte("\\=|\\!\\=|\\~|\\!\\~"), token(typeFieldOperation))
@@ -76,7 +76,7 @@ func token(tokenType int) lex.Action {
 	}
 }
 
-func analizeString(s *lex.Scanner, m *machines.Match) (interface{}, error) {
+func analyzeString(s *lex.Scanner, m *machines.Match) (interface{}, error) {
 	tokenType := typeString
 	strMatch := string(m.Bytes)
 	if strMatch == opAnd || strMatch == opOr {
@@ -85,7 +85,7 @@ func analizeString(s *lex.Scanner, m *machines.Match) (interface{}, error) {
 	return s.Token(tokenType, strMatch, m), nil
 }
 
-func skip(s *lex.Scanner, m *machines.Match) (interface{}, error) {
+func skip(_ *lex.Scanner, _ *machines.Match) (interface{}, error) {
 	return nil, nil
 }
 

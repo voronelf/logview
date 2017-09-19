@@ -3,6 +3,7 @@ package command
 import (
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/voronelf/logview/core"
 	"testing"
 )
@@ -10,7 +11,7 @@ import (
 func newTailForTest() (*Tail, chan<- struct{}) {
 	shutdownCh := make(chan struct{})
 	return &Tail{
-		FileReader:    &core.MockFileReader{},
+		RowProvider:   &core.MockRowProvider{},
 		FilterFactory: &core.MockFilterFactory{},
 		Formatter:     &core.MockFormatter{},
 		Ui:            &cli.MockUi{},
@@ -22,22 +23,25 @@ func TestTail_Run(t *testing.T) {
 	cmd, shutdownCh := newTailForTest()
 	defer close(shutdownCh)
 	mockFilterFactory := cmd.FilterFactory.(*core.MockFilterFactory)
-	mockFileReader := cmd.FileReader.(*core.MockFileReader)
+	mockProvider := cmd.RowProvider.(*core.MockRowProvider)
 	mockFormatter := cmd.Formatter.(*core.MockFormatter)
 
-	filter := &core.MockFilter{}
 	row := core.Row{Data: map[string]interface{}{"someKey": "someValue"}}
 	channel := make(chan core.Row, 2)
 	channel <- row
 	channel <- row
 	close(channel)
-	mockFilterFactory.On("NewFilter", "someFilter").Return(filter, nil).Once()
-	mockFileReader.On("ReadTail", "someFile", int64(123), filter).Return((<-chan core.Row)(channel), nil).Once()
+	mockFilter := &core.MockFilter{}
+	mockFilterFactory.On("NewFilter", "someFilter").Return(mockFilter, nil).Once()
+	mockProvider.On("ReadFileTail", mock.Anything, "someFile", int64(123)).Return((<-chan core.Row)(channel), nil).Once()
+	mockFilter.On("Match", row).Return(true).Twice()
 	mockFormatter.On("Format", row).Return("SomeData").Twice()
 
 	cmd.Run([]string{"-f", "someFile", "-b", "123", "-c", "someFilter"})
+
+	mockProvider.AssertExpectations(t)
 	mockFilterFactory.AssertExpectations(t)
-	mockFileReader.AssertExpectations(t)
+	mockFilter.AssertExpectations(t)
 	mockFormatter.AssertExpectations(t)
 	assert.Equal(t, "SomeData\nSomeData\n", cmd.Ui.(*cli.MockUi).OutputWriter.String())
 }
