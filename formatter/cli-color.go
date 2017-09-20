@@ -3,6 +3,7 @@ package formatter
 import (
 	"github.com/fatih/color"
 	"github.com/voronelf/logview/core"
+	"sort"
 )
 
 func NewCliColor() *cliColor {
@@ -24,20 +25,25 @@ func (s *cliColor) Format(row core.Row) string {
 	clrError := color.New(color.FgRed)
 
 	accentFields := map[string]struct{}{
-		"message":        struct{}{},
-		"module":         struct{}{},
-		"request_system": struct{}{},
+		"message":        {},
+		"module":         {},
+		"request_system": {},
 	}
 
 	divider := clrAround.Sprint("**********")
 	text := divider + " " + s.formatHeader(row) + " " + divider + "\n"
 	if row.Err == nil {
-		for field, value := range row.Data {
+		fields := make([]string, 0, len(row.Data))
+		for field := range row.Data {
+			fields = append(fields, field)
+		}
+		sort.Strings(fields)
+		for _, field := range fields {
 			_, accent := accentFields[field]
 			if accent {
-				text += "   " + clrAccentField.Sprint(field) + clrAround.Sprint(": ") + clrAccentValue.Sprint(value) + "\n"
+				text += "   " + clrAccentField.Sprint(field) + clrAround.Sprint(": ") + clrAccentValue.Sprint(row.Data[field]) + "\n"
 			} else {
-				text += "   " + clrField.Sprint(field) + clrAround.Sprint(": ") + clrValue.Sprint(value) + "\n"
+				text += "   " + clrField.Sprint(field) + clrAround.Sprint(": ") + clrValue.Sprint(row.Data[field]) + "\n"
 			}
 		}
 	} else {
