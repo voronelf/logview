@@ -5,6 +5,7 @@ import (
 	"github.com/voronelf/logview/core"
 	"io"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -23,6 +24,17 @@ func doMain(di *core.DIContainer, ui cli.Ui, helpWriter io.Writer, args []string
 	err := di.Populate()
 	if err != nil {
 		return 1, err
+	}
+
+	if len(args) == 0 {
+		args = append(args, "watch")
+	} else if len(args) >= 1 {
+		if strings.Contains(args[0], "-") && args[0] != "--help" && args[0] != "-h" {
+			args = append([]string{"watch"}, args...)
+		}
+		if args[0] == "help" {
+			args[0] = "--help"
+		}
 	}
 	c := cli.CLI{
 		Name:       "logview",

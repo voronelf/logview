@@ -37,12 +37,9 @@ func (*factory) NewFilter(condition string) (core.Filter, error) {
 }
 
 const (
-	opEqual       = "="
-	opNotEqual    = "!="
-	opContains    = "~"
-	opNotContains = "!~"
-	opAnd         = "and"
-	opOr          = "or"
+	opWildcard = ":"
+	opAnd      = "and"
+	opOr       = "or"
 )
 
 const (
@@ -55,10 +52,10 @@ const (
 
 func initLexer() (*lex.Lexer, error) {
 	lexer := lex.NewLexer()
-	lexer.Add([]byte("([a-z]|[0-9]|_|\\-|\\.|\\|)+"), analyzeString)
-	lexer.Add([]byte("\\'"), giveStringBetweenQuotes('\''))
-	lexer.Add([]byte("\\\""), giveStringBetweenQuotes('"'))
-	lexer.Add([]byte("\\=|\\!\\=|\\~|\\!\\~"), token(typeFieldOperation))
+	lexer.Add([]byte("([a-z]|[0-9]|_|\\-|\\.|\\*|\\!|\\|)+"), analyzeString)
+	lexer.Add([]byte("\\'"), takeStringBetweenQuotes('\''))
+	lexer.Add([]byte("\\\""), takeStringBetweenQuotes('"'))
+	lexer.Add([]byte("\\:"), token(typeFieldOperation))
 	lexer.Add([]byte("\\("), token(typeOpenBracket))
 	lexer.Add([]byte("\\)"), token(typeCloseBracket))
 	lexer.Add([]byte("( |\t|\n|\r)+"), skip)
@@ -89,7 +86,7 @@ func skip(_ *lex.Scanner, _ *machines.Match) (interface{}, error) {
 	return nil, nil
 }
 
-func giveStringBetweenQuotes(quoteSymbol byte) lex.Action {
+func takeStringBetweenQuotes(quoteSymbol byte) lex.Action {
 	return func(scan *lex.Scanner, match *machines.Match) (interface{}, error) {
 		str := make([]byte, 0, 10)
 		match.EndLine = match.StartLine
@@ -211,30 +208,8 @@ func createFieldOperation(s *lex.Scanner, fieldToken *lex.Token) (core.Filter, e
 		return nil, errors.Errorf("Unexpected token type for field value: '%s'", string(fieldValueToken.Lexeme))
 	}
 	switch operation {
-	case opEqual:
-		return &Equal{
-			Field: string(fieldToken.Lexeme),
-			Value: string(fieldValueToken.Lexeme),
-		}, nil
-	case opNotEqual:
-		return &Not{
-			Child: &Equal{
-				Field: string(fieldToken.Lexeme),
-				Value: string(fieldValueToken.Lexeme),
-			},
-		}, nil
-	case opContains:
-		return &Contains{
-			Field:  string(fieldToken.Lexeme),
-			Substr: string(fieldValueToken.Lexeme),
-		}, nil
-	case opNotContains:
-		return &Not{
-			Child: &Contains{
-				Field:  string(fieldToken.Lexeme),
-				Substr: string(fieldValueToken.Lexeme),
-			},
-		}, nil
+	case opWildcard:
+		return NewWildcard(string(fieldToken.Lexeme), string(fieldValueToken.Lexeme)), nil
 	default:
 		return nil, errors.Errorf("Unknown operation '%s'", operation)
 	}

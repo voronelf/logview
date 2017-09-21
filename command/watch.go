@@ -101,7 +101,7 @@ func (c *Watch) watchStdin(filter core.Filter) int {
 }
 
 func (*Watch) Synopsis() string {
-	return "Subscribe on log file changes, analyze new rows and show rows matched by filter condition. Args: [-f filePath] [-c condition]"
+	return "Default command. Subscribe on log file changes, analyze new rows and show rows matched by filter condition. Args: [-f filePath] [-c condition]"
 }
 
 func (*Watch) Help() string {
@@ -113,11 +113,15 @@ Usage: logview watch [-f filePath] [-c condition]
 Options:
 
     -f filePath    Log file path, if emtpy - used stdin
-    -c condition   Filter condition. Contains one or more field check.
-                   Every field check is: 'fieldName operation fieldValue', where
-                   operation is one of '=', '!=', '~', '!~'.
+    -c condition   Filter condition. Contains one or more field checks.
+                   Every field check is 'fieldName : fieldValue', where
+                     fieldName  - name of field; can be wildcard with '*'
+                     fieldValue - value of field, case insensitive;
+                                  can be many values divided '|';
+                                  every value can be wildcard with '*';
+                                  every value can be negative, starts from '!'
                    Field checks are divided by logic operations: 'and', 'or'.
-                   Also you can use brackets.
+                   Also you can use brackets for prioritize operations.
 `
 	return strings.TrimSpace(text)
 }
