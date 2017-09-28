@@ -39,3 +39,12 @@ type FilterFactory interface {
 type Formatter interface {
 	Format(row Row) string
 }
+
+//go:generate mockery -name Settings -inpkg -case=underscore
+
+type Template map[string]string
+
+type Settings interface {
+	GetTemplates() (map[string]Template, error)
+	SaveTemplate(name string, tpl Template) error
+}

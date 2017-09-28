@@ -1,0 +1,4 @@
+[templates]
+  [templates.tpl1]
+    c = "ccc"
+    f = "fff"

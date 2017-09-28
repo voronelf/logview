@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"github.com/mitchellh/cli"
@@ -17,26 +18,22 @@ type Watch struct {
 	FilterFactory core.FilterFactory `inject:"FilterFactory"`
 	Formatter     core.Formatter     `inject:"FormatterCliColor"`
 	Ui            cli.Ui             `inject:"CliUi"`
+	Settings      core.Settings      `inject:"Settings"`
 }
 
 var _ cli.Command = (*Watch)(nil)
 
 func (c *Watch) Run(args []string) int {
-	var filePath, filterCondition string
-	cmdFlags := flag.NewFlagSet("watch", flag.ContinueOnError)
-	cmdFlags.StringVar(&filePath, "f", "", "")
-	cmdFlags.StringVar(&filterCondition, "c", "", "")
-	err := cmdFlags.Parse(args)
+	filePath, filterCondition, err := c.parseArgs(args)
 	if err != nil {
-		return cli.RunResultHelp
+		c.Ui.Error(err.Error())
+		return 1
 	}
-
 	filter, err := c.FilterFactory.NewFilter(filterCondition)
 	if err != nil {
 		c.Ui.Error(err.Error())
 		return 1
 	}
-
 	if filePath == "" {
 		c.Ui.Output(messageWatchStdin(filterCondition))
 		return c.watchStdin(filter)
@@ -44,6 +41,43 @@ func (c *Watch) Run(args []string) int {
 		c.Ui.Output(messageWatchFile(filePath, filterCondition))
 		return c.watchFile(filePath, filter)
 	}
+}
+
+func (c *Watch) parseArgs(args []string) (filePath, condition string, retErr error) {
+	var tplName string
+	cmdFlags := flag.NewFlagSet("watch", flag.ContinueOnError)
+	cmdFlags.StringVar(&filePath, "f", "", "")
+	cmdFlags.StringVar(&condition, "c", "", "")
+	cmdFlags.StringVar(&tplName, "t", "", "")
+	err := cmdFlags.Parse(args)
+	if err != nil {
+		return "", "", err
+	}
+	if tplName != "" {
+		templates, err := c.Settings.GetTemplates()
+		if err != nil {
+			retErr = errors.New("template loading error: " + err.Error())
+			return
+		}
+		tpl, ok := templates[tplName]
+		if !ok {
+			retErr = errors.New("template not found")
+			return
+		}
+		if filePath == "" {
+			tplFilePath, ok := tpl["f"]
+			if ok {
+				filePath = tplFilePath
+			}
+		}
+		if condition == "" {
+			tplCondition, ok := tpl["c"]
+			if ok {
+				condition = tplCondition
+			}
+		}
+	}
+	return
 }
 
 func (c *Watch) watchFile(filePath string, filter core.Filter) int {

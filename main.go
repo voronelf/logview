@@ -29,15 +29,22 @@ func doMain(di *core.DIContainer, ui cli.Ui, helpWriter io.Writer, args []string
 	if len(args) == 0 {
 		args = append(args, "watch")
 	} else if len(args) >= 1 {
-		if strings.Contains(args[0], "-") && args[0] != "--help" && args[0] != "-h" {
-			args = append([]string{"watch"}, args...)
-		}
-		if args[0] == "help" {
+		switch args[0] {
+		case "-h", "--help", "--version":
+			// do nothing
+		case "help":
 			args[0] = "--help"
+		case "-v":
+			args[0] = "--version"
+		default:
+			if strings.Contains(args[0], "-") {
+				args = append([]string{"watch"}, args...)
+			}
 		}
 	}
 	c := cli.CLI{
 		Name:       "logview",
+		Version:    "0.9b",
 		Args:       args,
 		Commands:   commands,
 		HelpWriter: helpWriter,

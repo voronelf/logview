@@ -26,7 +26,7 @@ func (r *rowProvider) WatchFileChanges(ctx context.Context, filePath string) (<-
 	if err != nil {
 		return outputCh, err
 	}
-	_, err = file.Seek(0, 2)
+	_, err = file.Seek(0, io.SeekEnd)
 	if err != nil {
 		return outputCh, err
 	}
@@ -80,7 +80,7 @@ func (r *rowProvider) ReadFileTail(ctx context.Context, filePath string, countBy
 		return nil, err
 	}
 	if countBytes > 0 {
-		fd.Seek(-countBytes, 2)
+		fd.Seek(-countBytes, io.SeekEnd)
 	}
 	go func() {
 		defer fd.Close()

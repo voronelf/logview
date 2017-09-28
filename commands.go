@@ -7,6 +7,7 @@ import (
 	"github.com/voronelf/logview/filter"
 	"github.com/voronelf/logview/formatter"
 	"github.com/voronelf/logview/provider"
+	"github.com/voronelf/logview/settings"
 	"os"
 	"os/signal"
 	"syscall"
@@ -23,12 +24,18 @@ func provideCommandsDependenciesInDI(di *core.DIContainer, ui cli.Ui) {
 
 	var f core.Formatter = formatter.NewCliColor()
 	di.Provide("FormatterCliColor", f)
+
+	var store core.Settings = settings.NewStore()
+	di.Provide("Settings", store)
 }
 
 func getCommands(di *core.DIContainer) map[string]cli.CommandFactory {
 	return map[string]cli.CommandFactory{
-		"watch": newCmdFactory(di, &command.Watch{ShutdownCh: getShutdownCh(), Stdin: os.Stdin}),
-		"tail":  newCmdFactory(di, &command.Tail{ShutdownCh: getShutdownCh()}),
+		"watch":    newCmdFactory(di, &command.Watch{ShutdownCh: getShutdownCh(), Stdin: os.Stdin}),
+		"tail":     newCmdFactory(di, &command.Tail{ShutdownCh: getShutdownCh()}),
+		"tpl":      newCmdFactory(di, &command.Tpl{}),
+		"tpl list": newCmdFactory(di, &command.TplList{}),
+		"tpl save": newCmdFactory(di, &command.TplSave{}),
 	}
 }
 
