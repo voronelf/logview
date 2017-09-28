@@ -6,6 +6,7 @@ import (
 	"github.com/mitchellh/cli"
 	"github.com/voronelf/logview/core"
 	"strings"
+	"time"
 )
 
 type Tail struct {
@@ -40,6 +41,7 @@ func (c *Tail) Run(args []string) int {
 	}
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	defer cancelCtx()
+	filePath = strings.Replace(filePath, "@today@", time.Now().UTC().Format("2006-01-02"), -1)
 	rowsChan, err := c.RowProvider.ReadFileTail(ctx, filePath, bytesCount)
 	if err != nil {
 		c.Ui.Error(err.Error())
@@ -76,7 +78,8 @@ Usage: logview tail -f filePath [-b bytes] [-c condition]
 
 Options:
 
-    -f filePath    Log file path, required
+    -f filePath    Log file path, required. Substring '@today@' will be replace
+                   to today date in format 2017-09-28.
     -b bytes       Count of bytes to last rows in file for analyzing
     -c condition   Filter condition. Contains one or more field checks.
                    Every field check is 'fieldName : fieldValue', where

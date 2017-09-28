@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/voronelf/logview/core"
 	"testing"
+	"time"
 )
 
 func newTailForTest() (*Tail, chan<- struct{}) {
@@ -44,4 +45,23 @@ func TestTail_Run(t *testing.T) {
 	mockFilter.AssertExpectations(t)
 	mockFormatter.AssertExpectations(t)
 	assert.Equal(t, "SomeData\nSomeData\n", cmd.Ui.(*cli.MockUi).OutputWriter.String())
+}
+
+func TestTail_Run_WithDateInFilePath(t *testing.T) {
+	cmd, shutdownCh := newTailForTest()
+	defer close(shutdownCh)
+	mockFilterFactory := cmd.FilterFactory.(*core.MockFilterFactory)
+	mockProvider := cmd.RowProvider.(*core.MockRowProvider)
+
+	incomingFile := "someFile_@today@.log"
+	expectedFile := "someFile_" + time.Now().UTC().Format("2006-01-02") + ".log"
+
+	channel := make(chan core.Row, 2)
+	close(channel)
+	mockFilterFactory.On("NewFilter", "someFilter").Return(&core.MockFilter{}, nil).Once()
+	mockProvider.On("ReadFileTail", mock.Anything, expectedFile, int64(123)).Return((<-chan core.Row)(channel), nil).Once()
+
+	cmd.Run([]string{"-f", incomingFile, "-b", "123", "-c", "someFilter"})
+
+	mockProvider.AssertExpectations(t)
 }

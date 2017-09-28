@@ -9,6 +9,7 @@ import (
 	"github.com/voronelf/logview/core"
 	"io"
 	"strings"
+	"time"
 )
 
 type Watch struct {
@@ -38,6 +39,7 @@ func (c *Watch) Run(args []string) int {
 		c.Ui.Output(messageWatchStdin(filterCondition))
 		return c.watchStdin(filter)
 	} else {
+		filePath = strings.Replace(filePath, "@today@", time.Now().UTC().Format("2006-01-02"), -1)
 		c.Ui.Output(messageWatchFile(filePath, filterCondition))
 		return c.watchFile(filePath, filter)
 	}
@@ -146,7 +148,8 @@ Usage: logview watch [-f filePath] [-c condition]
 
 Options:
 
-    -f filePath    Log file path, if emtpy - used stdin
+    -f filePath    Log file path, if emtpy - used stdin. Substring '@today@' will be replace
+                   to today date in format 2017-09-28.
     -c condition   Filter condition. Contains one or more field checks.
                    Every field check is 'fieldName : fieldValue', where
                      fieldName  - name of field; can be wildcard with '*'

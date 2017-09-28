@@ -205,3 +205,21 @@ func TestWatch_parseArgs(t *testing.T) {
 		})
 	}
 }
+
+func TestWatch_Run_FileWithDate(t *testing.T) {
+	cmd, shutdownCh := newWatchForTest()
+	defer close(shutdownCh)
+	mockProvider := cmd.RowProvider.(*core.MockRowProvider)
+	mockFilterFactory := cmd.FilterFactory.(*core.MockFilterFactory)
+
+	incomingFile := "someFile_@today@.log"
+	expectedFile := "someFile_" + time.Now().UTC().Format("2006-01-02") + ".log"
+
+	mockFilterFactory.On("NewFilter", "someFilter").Return(&core.MockFilter{}, nil).Once()
+	mockProvider.On("WatchFileChanges", mock.Anything, expectedFile).Return(make(<-chan core.Row), nil).Once()
+
+	go cmd.Run([]string{"-f", incomingFile, "-c", "someFilter"})
+	time.Sleep(time.Millisecond)
+
+	mockProvider.AssertExpectations(t)
+}
