@@ -5,6 +5,7 @@ import (
 	wildcardPkg "github.com/ryanuber/go-glob"
 	"github.com/voronelf/logview/core"
 	"sort"
+	"strings"
 )
 
 func NewCliColor() *cliColor {
@@ -77,9 +78,9 @@ func (s *cliColor) Format(row core.Row, params core.FormatParams) string {
 
 func (*cliColor) isMatchWildcard(wildcard, value string) bool {
 	if wildcard[0] == '!' {
-		return !wildcardPkg.Glob(wildcard[1:], value)
+		return !wildcardPkg.Glob(strings.ToLower(wildcard[1:]), strings.ToLower(value))
 	} else {
-		return wildcardPkg.Glob(wildcard, value)
+		return wildcardPkg.Glob(strings.ToLower(wildcard), strings.ToLower(value))
 	}
 }
 

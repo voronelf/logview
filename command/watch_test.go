@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 	"strings"
+	"strconv"
 )
 
 func newWatchForTest() (*Watch, chan<- struct{}) {
@@ -82,7 +83,7 @@ func TestWatch_Run_Stdin(t *testing.T) {
 	rowsCh <- row
 	time.Sleep(time.Millisecond)
 	rowsCh <- row
-	time.Sleep(time.Millisecond)
+	time.Sleep(2 * time.Millisecond)
 
 	mockProvider.AssertExpectations(t)
 	mockFilterFactory.AssertExpectations(t)
@@ -171,7 +172,7 @@ func TestWatch_Run_Template(t *testing.T) {
 	rowsChan <- row
 	time.Sleep(time.Millisecond)
 	rowsChan <- row
-	time.Sleep(time.Millisecond)
+	time.Sleep(2 * time.Millisecond)
 
 	mockSettings.AssertExpectations(t)
 	mockProvider.AssertExpectations(t)
