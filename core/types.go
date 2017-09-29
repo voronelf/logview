@@ -37,14 +37,26 @@ type FilterFactory interface {
 //go:generate mockery -name Formatter -inpkg -case=underscore
 
 type Formatter interface {
-	Format(row Row) string
+	Format(row Row, params FormatParams) string
+}
+
+type FormatParams struct {
+	OutputFields []string
+	AccentFields []string
+}
+
+func DefaultFormatParams() FormatParams {
+	return FormatParams{
+		OutputFields: []string{},
+		AccentFields: []string{},
+	}
 }
 
 //go:generate mockery -name Settings -inpkg -case=underscore
-
-type Template map[string]string
 
 type Settings interface {
 	GetTemplates() (map[string]Template, error)
 	SaveTemplate(name string, tpl Template) error
 }
+
+type Template map[string]string

@@ -36,7 +36,7 @@ func TestTail_Run(t *testing.T) {
 	mockFilterFactory.On("NewFilter", "someFilter").Return(mockFilter, nil).Once()
 	mockProvider.On("ReadFileTail", mock.Anything, "someFile", int64(123)).Return((<-chan core.Row)(channel), nil).Once()
 	mockFilter.On("Match", row).Return(true).Twice()
-	mockFormatter.On("Format", row).Return("SomeData").Twice()
+	mockFormatter.On("Format", row, core.DefaultFormatParams()).Return("SomeData").Twice()
 
 	cmd.Run([]string{"-f", "someFile", "-b", "123", "-c", "someFilter"})
 

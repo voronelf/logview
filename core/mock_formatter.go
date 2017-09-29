@@ -7,13 +7,13 @@ type MockFormatter struct {
 	mock.Mock
 }
 
-// Format provides a mock function with given fields: row
-func (_m *MockFormatter) Format(row Row) string {
-	ret := _m.Called(row)
+// Format provides a mock function with given fields: row, params
+func (_m *MockFormatter) Format(row Row, params FormatParams) string {
+	ret := _m.Called(row, params)
 
 	var r0 string
-	if rf, ok := ret.Get(0).(func(Row) string); ok {
-		r0 = rf(row)
+	if rf, ok := ret.Get(0).(func(Row, FormatParams) string); ok {
+		r0 = rf(row, params)
 	} else {
 		r0 = ret.Get(0).(string)
 	}

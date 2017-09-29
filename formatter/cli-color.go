@@ -2,6 +2,7 @@ package formatter
 
 import (
 	"github.com/fatih/color"
+	wildcardPkg "github.com/ryanuber/go-glob"
 	"github.com/voronelf/logview/core"
 	"sort"
 )
@@ -15,7 +16,7 @@ type cliColor struct {
 
 var _ core.Formatter = (*cliColor)(nil)
 
-func (s *cliColor) Format(row core.Row) string {
+func (s *cliColor) Format(row core.Row, params core.FormatParams) string {
 	clrAround := color.New(color.FgHiMagenta)
 	clrAround.DisableColor()
 	clrField := color.New(color.FgHiBlue)
@@ -24,26 +25,47 @@ func (s *cliColor) Format(row core.Row) string {
 	clrAccentValue := color.New(color.FgHiGreen)
 	clrError := color.New(color.FgRed)
 
-	accentFields := map[string]struct{}{
-		"message":        {},
-		"module":         {},
-		"request_system": {},
-	}
-
 	divider := clrAround.Sprint("**********")
 	text := divider + " " + s.formatHeader(row) + " " + divider + "\n"
 	if row.Err == nil {
-		fields := make([]string, 0, len(row.Data))
-		for field := range row.Data {
-			fields = append(fields, field)
+		fieldList := make([]string, 0, len(row.Data))
+		if len(params.OutputFields) > 0 {
+			for field := range row.Data {
+				for _, wildcard := range params.OutputFields {
+					if s.isMatchWildcard(wildcard, field) {
+						fieldList = append(fieldList, field)
+						break
+					}
+				}
+			}
+		} else {
+			for field := range row.Data {
+				fieldList = append(fieldList, field)
+			}
 		}
-		sort.Strings(fields)
-		for _, field := range fields {
-			_, accent := accentFields[field]
-			if accent {
-				text += "   " + clrAccentField.Sprint(field) + clrAround.Sprint(": ") + clrAccentValue.Sprint(row.Data[field]) + "\n"
+		sort.Strings(fieldList)
+		for _, field := range fieldList {
+			value, ok := row.Data[field]
+			if !ok {
+				continue
+			}
+			var accentFields []string
+			if len(params.AccentFields) > 0 {
+				accentFields = params.AccentFields
 			} else {
-				text += "   " + clrField.Sprint(field) + clrAround.Sprint(": ") + clrValue.Sprint(row.Data[field]) + "\n"
+				accentFields = []string{"message", "module", "request_system"}
+			}
+			accent := false
+			for _, accentField := range accentFields {
+				if field == accentField {
+					accent = true
+					break
+				}
+			}
+			if accent {
+				text += "   " + clrAccentField.Sprint(field) + clrAround.Sprint(": ") + clrAccentValue.Sprint(value) + "\n"
+			} else {
+				text += "   " + clrField.Sprint(field) + clrAround.Sprint(": ") + clrValue.Sprint(value) + "\n"
 			}
 		}
 	} else {
@@ -51,6 +73,14 @@ func (s *cliColor) Format(row core.Row) string {
 	}
 	text += divider
 	return text
+}
+
+func (*cliColor) isMatchWildcard(wildcard, value string) bool {
+	if wildcard[0] == '!' {
+		return !wildcardPkg.Glob(wildcard[1:], value)
+	} else {
+		return wildcardPkg.Glob(wildcard, value)
+	}
 }
 
 func (*cliColor) formatHeader(row core.Row) string {

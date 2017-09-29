@@ -47,6 +47,7 @@ func (c *Tail) Run(args []string) int {
 		c.Ui.Error(err.Error())
 		return 1
 	}
+	formatParams := core.DefaultFormatParams()
 	for {
 		select {
 		case row, ok := <-rowsChan:
@@ -58,7 +59,7 @@ func (c *Tail) Run(args []string) int {
 				continue
 			}
 			if filter.Match(row) {
-				c.Ui.Output(c.Formatter.Format(row))
+				c.Ui.Output(c.Formatter.Format(row, formatParams))
 			}
 		case <-c.ShutdownCh:
 			return 0

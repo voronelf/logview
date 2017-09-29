@@ -72,7 +72,7 @@ func TestRowProvider_WatchFileChanges_twoRows(t *testing.T) {
 	defer stopWatch()
 
 	tempFile.Write([]byte("{\"field\": 777}\n{\"field\": 888.99}\n"))
-	time.Sleep(time.Millisecond)
+	time.Sleep(2 * time.Millisecond)
 	value, loaded := results.Load(0)
 	if assert.True(t, loaded) {
 		assert.Equal(t, float64(777), value.(core.Row).Data["field"])
@@ -102,7 +102,7 @@ func TestRowProvider_WatchFileChanges_partialWrite(t *testing.T) {
 	assert.False(t, loaded)
 
 	tempFile.Write([]byte("\n"))
-	time.Sleep(time.Millisecond)
+	time.Sleep(2 * time.Millisecond)
 	value, loaded := results.Load(0)
 	if assert.True(t, loaded) {
 		assert.Equal(t, "456", value.(core.Row).Data["field"])

@@ -25,7 +25,7 @@ type Watch struct {
 var _ cli.Command = (*Watch)(nil)
 
 func (c *Watch) Run(args []string) int {
-	filePath, filterCondition, err := c.parseArgs(args)
+	filePath, filterCondition, formatParams, err := c.parseArgs(args)
 	if err != nil {
 		c.Ui.Error(err.Error())
 		return 1
@@ -37,33 +37,36 @@ func (c *Watch) Run(args []string) int {
 	}
 	if filePath == "" {
 		c.Ui.Output(messageWatchStdin(filterCondition))
-		return c.watchStdin(filter)
+		return c.watchStdin(filter, formatParams)
 	} else {
 		filePath = strings.Replace(filePath, "@today@", time.Now().UTC().Format("2006-01-02"), -1)
 		c.Ui.Output(messageWatchFile(filePath, filterCondition))
-		return c.watchFile(filePath, filter)
+		return c.watchFile(filePath, filter, formatParams)
 	}
 }
 
-func (c *Watch) parseArgs(args []string) (filePath, condition string, retErr error) {
-	var tplName string
+func (c *Watch) parseArgs(args []string) (filePath, condition string, formatParams core.FormatParams, err error) {
+	formatParams = core.DefaultFormatParams()
+	var tplName, showFields, accentFields string
 	cmdFlags := flag.NewFlagSet("watch", flag.ContinueOnError)
 	cmdFlags.StringVar(&filePath, "f", "", "")
 	cmdFlags.StringVar(&condition, "c", "", "")
 	cmdFlags.StringVar(&tplName, "t", "", "")
-	err := cmdFlags.Parse(args)
+	cmdFlags.StringVar(&showFields, "o", "", "")
+	cmdFlags.StringVar(&accentFields, "a", "", "")
+	err = cmdFlags.Parse(args)
 	if err != nil {
-		return "", "", err
+		return
 	}
 	if tplName != "" {
-		templates, err := c.Settings.GetTemplates()
-		if err != nil {
-			retErr = errors.New("template loading error: " + err.Error())
+		templates, e := c.Settings.GetTemplates()
+		if e != nil {
+			err = errors.New("template loading error: " + e.Error())
 			return
 		}
 		tpl, ok := templates[tplName]
 		if !ok {
-			retErr = errors.New("template not found")
+			err = errors.New("template not found")
 			return
 		}
 		if filePath == "" {
@@ -78,11 +81,37 @@ func (c *Watch) parseArgs(args []string) (filePath, condition string, retErr err
 				condition = tplCondition
 			}
 		}
+		if showFields == "" {
+			tplShowFields, ok := tpl["o"]
+			if ok {
+				showFields = tplShowFields
+			}
+		}
+		if accentFields == "" {
+			tplAccentFields, ok := tpl["a"]
+			if ok {
+				accentFields = tplAccentFields
+			}
+		}
+	}
+	if showFields != "" && showFields != "*" {
+		fields := strings.Split(showFields, ",")
+		for k, v := range fields {
+			fields[k] = strings.TrimSpace(v)
+		}
+		formatParams.OutputFields = fields
+	}
+	if accentFields != "" && accentFields != "*" {
+		fields := strings.Split(accentFields, ",")
+		for k, v := range fields {
+			fields[k] = strings.TrimSpace(v)
+		}
+		formatParams.AccentFields = fields
 	}
 	return
 }
 
-func (c *Watch) watchFile(filePath string, filter core.Filter) int {
+func (c *Watch) watchFile(filePath string, filter core.Filter, formatParams core.FormatParams) int {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	defer cancelCtx()
 	rowsChan, err := c.RowProvider.WatchFileChanges(ctx, filePath)
@@ -101,7 +130,7 @@ func (c *Watch) watchFile(filePath string, filter core.Filter) int {
 				continue
 			}
 			if filter.Match(row) {
-				c.Ui.Output(c.Formatter.Format(row))
+				c.Ui.Output(c.Formatter.Format(row, formatParams))
 			}
 		case <-c.ShutdownCh:
 			return 0
@@ -109,7 +138,7 @@ func (c *Watch) watchFile(filePath string, filter core.Filter) int {
 	}
 }
 
-func (c *Watch) watchStdin(filter core.Filter) int {
+func (c *Watch) watchStdin(filter core.Filter, formatParams core.FormatParams) int {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	defer cancelCtx()
 	rowsChan, err := c.RowProvider.WatchOpenedStream(ctx, c.Stdin)
@@ -128,7 +157,7 @@ func (c *Watch) watchStdin(filter core.Filter) int {
 				continue
 			}
 			if filter.Match(row) {
-				c.Ui.Output(c.Formatter.Format(row))
+				c.Ui.Output(c.Formatter.Format(row, formatParams))
 			}
 		case <-c.ShutdownCh:
 			return 0
@@ -137,12 +166,12 @@ func (c *Watch) watchStdin(filter core.Filter) int {
 }
 
 func (*Watch) Synopsis() string {
-	return "Default command. Subscribe on log file changes, analyze new rows and show rows matched by filter condition. Args: [-f filePath] [-c condition]"
+	return "Default command. Subscribe on log file changes, analyze new rows and show rows matched by filter condition. Args: [-f filePath] [-c condition]  [-o outputFields] [-a accentedFields]"
 }
 
 func (*Watch) Help() string {
 	text := `
-Usage: logview watch [-f filePath] [-c condition]
+Usage: logview watch [-f filePath] [-c condition] [-o outputFields] [-a accentedFields]
 
     Subscribe on log file changes, analyze new rows and show rows matched by filter condition
 
@@ -159,6 +188,9 @@ Options:
                                   every value can be negative, starts from '!'
                    Field checks are divided by logic operations: 'and', 'or'.
                    Also you can use brackets for prioritize operations.
+    -o fields      Comma-separated list of fields for output. Will show only this fields in that order.
+                   Every field can be wildcard or negative wildcard (starts from !).
+    -a fields      Comma-separated list of fields, which will show with high color.
 `
 	return strings.TrimSpace(text)
 }
